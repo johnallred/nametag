@@ -9,6 +9,8 @@
   },
   "scripts": {
     "typecheck": "tsc",
+    "release": "node src/release/main.ts",
+    "server": "node src/server/main.ts",
     "test": "node --test \"test/**/*.test.ts\""
   },
   "devDependencies": {
