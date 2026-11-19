@@ -20,7 +20,7 @@ describe("app bundle", () => {
 
   it(
     "runs, reports its baked-in version, and saves state when stopped",
-    { skip: process.platform === "win32" && "Windows has no SIGTERM; graceful stop arrives over IPC in a later slice" },
+    { skip: process.platform === "win32" && "Windows has no SIGTERM; the IPC shutdown test below covers graceful stop there" },
     async () => {
       const dataDir = await makeTempDir();
       const child = spawn(process.execPath, [bundle], {
