@@ -34,20 +34,20 @@ questions I would have asked, the answer I guessed, and what each guess led to.
 ```
             ┌──────────────── developer machine ───────────────┐
             │  release keygen   →  private key (never committed)│
-            │  release publish  →  app.js + signed manifest     │
+            │  release publish  →  app.cjs + signed manifest     │
             └───────────────────────────┬───────────────────────┘
                                         │ copy to server
                                         ▼
             ┌──────────── update server (static files) ─────────┐
             │  GET /manifest.json                                │
-            │  GET /artifacts/<version>/app.js                   │
+            │  GET /artifacts/<version>/app.cjs                   │
             └───────────────────────────┬───────────────────────┘
                                         │ HTTPS poll
             ┌──────────────── client machine ───────▼───────────┐
             │  launcher (SEA exe, embeds Node)                   │
             │     │  spawns itself in app mode, IPC channel      │
             │     ▼                                              │
-            │  app (versions/<current>/app.js)                   │
+            │  app (versions/<current>/app.cjs)                   │
             │     ├─ ticker (the "real" program)                 │
             │     └─ updater: poll → verify → stage → notify     │
             └────────────────────────────────────────────────────┘
@@ -98,8 +98,8 @@ nametag/
 ├── nametag[.exe]          launcher
 ├── current                text file containing the active version, e.g. "1.4.0"
 ├── versions/
-│   ├── 1.3.0/app.js       previous version (the rollback target)
-│   └── 1.4.0/app.js       current version
+│   ├── 1.3.0/app.cjs       previous version (the rollback target)
+│   └── 1.4.0/app.cjs       current version
 ├── launcher-state.json    owned by the launcher: previous version, bad versions
 ├── app-state.json         owned by the app: tick counter, etc.
 ├── config.json            optional: manifest URL, poll interval
@@ -119,7 +119,7 @@ parses them.
 
 ```json
 {
-  "signed": "{\"version\":\"1.4.0\",\"channel\":\"stable\",\"publishedAt\":\"2026-11-18T12:00:00Z\",\"expiresAt\":\"2026-12-18T12:00:00Z\",\"minLauncherVersion\":\"1.0.0\",\"artifact\":{\"url\":\"artifacts/1.4.0/app.js\",\"size\":48211,\"sha256\":\"9f2c…\"}}",
+  "signed": "{\"version\":\"1.4.0\",\"channel\":\"stable\",\"publishedAt\":\"2026-11-18T12:00:00Z\",\"expiresAt\":\"2026-12-18T12:00:00Z\",\"minLauncherVersion\":\"1.0.0\",\"artifact\":{\"url\":\"artifacts/1.4.0/app.cjs\",\"size\":48211,\"sha256\":\"9f2c…\"}}",
   "signature": "<base64 Ed25519 signature over the UTF-8 bytes of `signed`>"
 }
 ```
@@ -139,7 +139,7 @@ clients stop accepting it. `release refresh` re-signs the current release with a
 expiry date and changes nothing else. Run it on a schedule, for example weekly with the
 default 30-day validity.
 
-A release is a single, platform-independent `app.js` bundle. The runtime lives in the
+A release is a single, platform-independent `app.cjs` bundle. The runtime lives in the
 launcher, so the same file works on every OS. There's no archive to unpack, which also
 removes a whole class of path-traversal bugs.
 
@@ -149,7 +149,7 @@ removes a whole class of path-traversal bugs.
    off exponentially up to the normal interval. The app keeps running regardless.
 2. **Verify.** The manifest is checked against the rules above. If nothing is acceptable,
    it waits for the next poll.
-3. **Download.** It streams the artifact into `versions/<v>.partial/app.js`, hashing as
+3. **Download.** It streams the artifact into `versions/<v>.partial/app.cjs`, hashing as
    it goes, with a request timeout. It aborts as soon as the download exceeds the
    declared `size`.
 4. **Check.** The size and SHA-256 must match the signed manifest. If they don't, the

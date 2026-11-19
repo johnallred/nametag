@@ -51,7 +51,7 @@ setInterval(() => {}, 1000);
 
 export async function installFakeApp(dataDir: string, version: string, behaviour: FakeAppBehaviour = {}): Promise<void> {
   await mkdir(path.join(dataDir, "versions", version), { recursive: true });
-  await writeFile(path.join(dataDir, "versions", version, "app.js"), source(behaviour));
+  await writeFile(path.join(dataDir, "versions", version, "app.cjs"), source(behaviour));
 }
 
 export async function readEvents(dataDir: string): Promise<AppEvent[]> {

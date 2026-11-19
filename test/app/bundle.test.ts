@@ -14,7 +14,7 @@ describe("app bundle", () => {
   let bundle: string;
 
   before(async () => {
-    bundle = path.join(await makeTempDir(), "app.js");
+    bundle = path.join(await makeTempDir(), "app.cjs");
     await buildApp({ version: "1.2.3", outFile: bundle });
   });
 
@@ -81,6 +81,6 @@ describe("app bundle", () => {
   });
 
   it("refuses an invalid version", async () => {
-    await assert.rejects(buildApp({ version: "1.2", outFile: path.join(await makeTempDir(), "app.js") }), /invalid version/);
+    await assert.rejects(buildApp({ version: "1.2", outFile: path.join(await makeTempDir(), "app.cjs") }), /invalid version/);
   });
 });

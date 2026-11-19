@@ -25,7 +25,7 @@ export async function assembleInstall({ outDir, appPath, version, launcherPath }
   }
 
   await mkdir(path.join(outDir, "versions", version), { recursive: true });
-  await copyFile(appPath, path.join(outDir, "versions", version, "app.js"));
+  await copyFile(appPath, path.join(outDir, "versions", version, "app.cjs"));
   if (launcherPath) {
     const target = path.join(outDir, executableName());
     await copyFile(launcherPath, target);

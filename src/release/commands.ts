@@ -1,5 +1,5 @@
 // The developer-side release tool: generate the signing key, and publish a
-// built app.js into a release directory that the update server serves.
+// built app.cjs into a release directory that the update server serves.
 
 import { createHash, createPublicKey, type KeyObject } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -49,7 +49,7 @@ export interface PublishOptions {
 }
 
 /**
- * Copies the artifact into `<root>/artifacts/<version>/app.js` and replaces
+ * Copies the artifact into `<root>/artifacts/<version>/app.cjs` and replaces
  * `<root>/manifest.json` with a newly signed manifest pointing at it.
  *
  * The manifest is written last and atomically, so clients see either the
@@ -80,7 +80,7 @@ export async function publish(options: PublishOptions): Promise<Release> {
 
   const artifact = await readFile(artifactPath);
   const sha256 = createHash("sha256").update(artifact).digest("hex");
-  const relativeUrl = `artifacts/${version}/app.js`;
+  const relativeUrl = `artifacts/${version}/app.cjs`;
   await storeArtifact(path.join(root, relativeUrl), artifact, sha256);
 
   const release: Release = {

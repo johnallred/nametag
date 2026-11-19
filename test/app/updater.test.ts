@@ -64,7 +64,7 @@ describe("Updater", () => {
       const { updater, layout, versionsDir } = await makeUpdater(target);
 
       assert.deepEqual(await updater.checkNow(), { status: "staged", version: "1.1.0" });
-      assert.equal(await readFile(path.join(layout.versions, "1.1.0", "app.js"), "utf8"), V2);
+      assert.equal(await readFile(path.join(layout.versions, "1.1.0", "app.cjs"), "utf8"), V2);
       assert.deepEqual(await versionsDir(), ["1.1.0"]);
     });
 
@@ -81,7 +81,7 @@ describe("Updater", () => {
       await target.publishVersion("1.1.0", V2);
       const { updater, layout } = await makeUpdater(target);
       await mkdir(path.join(layout.versions, "1.1.0"), { recursive: true });
-      await writeFile(path.join(layout.versions, "1.1.0", "app.js"), V2);
+      await writeFile(path.join(layout.versions, "1.1.0", "app.cjs"), V2);
       // If it tried to download, this would fail with a 404.
       await rm(path.join(target.root, "artifacts", "1.1.0"), { recursive: true });
 
@@ -93,10 +93,10 @@ describe("Updater", () => {
       await target.publishVersion("1.1.0", V2);
       const { updater, layout } = await makeUpdater(target);
       await mkdir(path.join(layout.versions, "1.1.0"), { recursive: true });
-      await writeFile(path.join(layout.versions, "1.1.0", "app.js"), "half-writ");
+      await writeFile(path.join(layout.versions, "1.1.0", "app.cjs"), "half-writ");
 
       assert.deepEqual(await updater.checkNow(), { status: "staged", version: "1.1.0" });
-      assert.equal(await readFile(path.join(layout.versions, "1.1.0", "app.js"), "utf8"), V2);
+      assert.equal(await readFile(path.join(layout.versions, "1.1.0", "app.cjs"), "utf8"), V2);
     });
   });
 
@@ -111,7 +111,7 @@ describe("Updater", () => {
     }
 
     const manifestPath = (target: ReleaseServer) => path.join(target.root, "manifest.json");
-    const artifactPath = (target: ReleaseServer) => path.join(target.root, "artifacts", "1.1.0", "app.js");
+    const artifactPath = (target: ReleaseServer) => path.join(target.root, "artifacts", "1.1.0", "app.cjs");
 
     it("a manifest altered after signing", () =>
       expectRejected(async (target) => {

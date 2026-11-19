@@ -1,4 +1,4 @@
-// Bundles the app into the single, platform-independent app.js that a release
+// Bundles the app into the single, platform-independent app.cjs that a release
 // consists of (ADR-0002).
 
 import { fileURLToPath } from "node:url";

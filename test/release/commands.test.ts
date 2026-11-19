@@ -14,7 +14,7 @@ async function setup() {
   const dir = await makeTempDir();
   const keys = generateSigningKeyPair();
   const root = path.join(dir, "releases");
-  const artifactPath = path.join(dir, "app.js");
+  const artifactPath = path.join(dir, "app.cjs");
   await writeFile(artifactPath, "console.log('hello');");
   const readManifest = async () =>
     readSignedManifest(JSON.parse(await readFile(path.join(root, MANIFEST_FILE), "utf8")), decodePublicKey(keys.publicKey));
@@ -24,7 +24,7 @@ async function setup() {
 /** Puts an artifact in place directly, as an interrupted earlier publish would have. */
 async function plantArtifact(root: string, version: string, content: string): Promise<void> {
   await mkdir(path.join(root, "artifacts", version), { recursive: true });
-  await writeFile(path.join(root, "artifacts", version, "app.js"), content);
+  await writeFile(path.join(root, "artifacts", version, "app.cjs"), content);
 }
 
 describe("keygen", () => {
@@ -60,7 +60,7 @@ describe("publish", () => {
       expiresAt: "2026-12-18T12:00:00Z",
       minLauncherVersion: "1.0.0",
       artifact: {
-        url: "artifacts/1.0.0/app.js",
+        url: "artifacts/1.0.0/app.cjs",
         size: "console.log('hello');".length,
         sha256: createHash("sha256").update("console.log('hello');").digest("hex"),
       },
@@ -76,7 +76,7 @@ describe("publish", () => {
 
     assert.equal((await readManifest()).version, "1.1.0");
     // The old artifact stays: clients mid-download, and CDN caches, may still want it.
-    assert.equal(await readFile(path.join(root, "artifacts/1.0.0/app.js"), "utf8"), "console.log('hello');");
+    assert.equal(await readFile(path.join(root, "artifacts/1.0.0/app.cjs"), "utf8"), "console.log('hello');");
   });
 
   for (const version of ["1.0.0", "0.9.0"]) {
@@ -143,7 +143,7 @@ describe("refresh", () => {
   it("refuses to re-sign a manifest whose artifact is missing or changed", async () => {
     const { keys, root, artifactPath } = await setup();
     await publish({ artifactPath, version: "1.0.0", privateKey: keys.privateKey, root, now });
-    await writeFile(path.join(root, "artifacts/1.0.0/app.js"), "tampered");
+    await writeFile(path.join(root, "artifacts/1.0.0/app.cjs"), "tampered");
     await assert.rejects(refresh({ root, privateKey: keys.privateKey, now }), /missing or doesn't match/);
   });
 

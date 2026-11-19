@@ -48,7 +48,7 @@ export async function saveLauncherState(layout: DataLayout, state: LauncherState
 }
 
 export function appPathFor(layout: DataLayout, version: string): string {
-  return path.join(layout.versions, version, "app.js");
+  return path.join(layout.versions, version, "app.cjs");
 }
 
 export async function isInstalled(layout: DataLayout, version: string): Promise<boolean> {

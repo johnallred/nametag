@@ -39,7 +39,7 @@ describe("update server", () => {
     root = path.join(base, "releases");
     await mkdir(path.join(root, "artifacts", "1.0.0"), { recursive: true });
     await writeFile(path.join(root, "manifest.json"), '{"signed":"{}","signature":"x"}');
-    await writeFile(path.join(root, "artifacts", "1.0.0", "app.js"), "console.log('v1');");
+    await writeFile(path.join(root, "artifacts", "1.0.0", "app.cjs"), "console.log('v1');");
     // Something an attacker would love to read, just outside the root.
     await writeFile(path.join(base, "secret.txt"), "private key material");
 
@@ -58,7 +58,7 @@ describe("update server", () => {
   });
 
   it("serves artifacts as immutable", async () => {
-    const res = await send(server, "GET", "/artifacts/1.0.0/app.js");
+    const res = await send(server, "GET", "/artifacts/1.0.0/app.cjs");
     assert.equal(res.status, 200);
     assert.equal(res.body, "console.log('v1');");
     assert.equal(res.headers["content-length"], String("console.log('v1');".length));
@@ -66,14 +66,14 @@ describe("update server", () => {
   });
 
   it("answers HEAD with headers and no body", async () => {
-    const res = await send(server, "HEAD", "/artifacts/1.0.0/app.js");
+    const res = await send(server, "HEAD", "/artifacts/1.0.0/app.cjs");
     assert.equal(res.status, 200);
     assert.equal(res.body, "");
     assert.equal(res.headers["content-length"], String("console.log('v1');".length));
   });
 
   it("returns 404 for missing files and directories", async () => {
-    assert.equal((await send(server, "GET", "/artifacts/9.9.9/app.js")).status, 404);
+    assert.equal((await send(server, "GET", "/artifacts/9.9.9/app.cjs")).status, 404);
     assert.equal((await send(server, "GET", "/artifacts")).status, 404);
     assert.equal((await send(server, "GET", "/")).status, 404);
   });

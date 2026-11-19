@@ -4,14 +4,15 @@
 
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createInterface } from "node:readline";
-import { before, describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { buildApp } from "../../src/build/app.ts";
 import { assembleInstall } from "../../src/build/install.ts";
-import { makeTempDir } from "../helpers.ts";
+import { makeTempDir, waitFor } from "../helpers.ts";
 
 const LAUNCHER = fileURLToPath(new URL("../../src/launcher/main.ts", import.meta.url));
 const run = promisify(execFile);
@@ -20,7 +21,7 @@ describe("launcher entry point", () => {
   let bundle: string;
 
   before(async () => {
-    bundle = path.join(await makeTempDir(), "app.js");
+    bundle = path.join(await makeTempDir(), "app.cjs");
     await buildApp({ version: "1.0.0", outFile: bundle });
   });
 
@@ -37,24 +38,31 @@ describe("launcher entry point", () => {
     "runs the app, refuses a second launcher, and stops the app gracefully",
     { skip: process.platform === "win32" && "stopping the launcher relies on SIGTERM" },
     async () => {
-      const dataDir = await makeTempDir();
+      // A package.json declaring ES modules above the install must not change
+      // how the CommonJS bundle loads (it did, when bundles were named app.js).
+      const parent = await makeTempDir();
+      await writeFile(path.join(parent, "package.json"), '{"type":"module"}');
+      const dataDir = path.join(parent, "nametag");
       await assembleInstall({ outDir: dataDir, appPath: bundle, version: "1.0.0" });
       const env = { ...process.env, NAMETAG_DATA_DIR: dataDir, NAMETAG_TICK_INTERVAL_MS: "20" };
 
-      const launcher = spawn(process.execPath, [LAUNCHER], { env, stdio: ["ignore", "pipe", "inherit"] });
+      const launcher = spawn(process.execPath, [LAUNCHER], { env, stdio: ["ignore", "pipe", "pipe"] });
       const exited = new Promise<number | null>((resolve) => launcher.on("exit", resolve));
-      const messages: string[] = [];
-      const lines = createInterface({ input: launcher.stdout });
-      const seen = (msg: string) => messages.includes(msg);
-      const reached = (msg: string) =>
-        new Promise<void>((resolve) => {
-          const check = () => seen(msg) && resolve();
-          lines.on("line", check);
-          check();
-        });
-      lines.on("line", (line) => messages.push((JSON.parse(line) as { msg: string }).msg));
+      // Never leave a launcher (and its app) running if an assertion fails.
+      after(() => void launcher.kill("SIGKILL"));
+      launcher.stderr.resume();
 
-      await reached("app healthy");
+      const messages: string[] = [];
+      createInterface({ input: launcher.stdout }).on("line", (line) => {
+        try {
+          messages.push((JSON.parse(line) as { msg: string }).msg);
+        } catch {
+          // Not a log line (e.g. a crash's stack trace).
+        }
+      });
+      const seen = (msg: string) => messages.includes(msg);
+
+      await waitFor(() => seen("app healthy"), 10_000, "app healthy");
 
       const second = await run(process.execPath, [LAUNCHER], { env });
       assert.match(second.stdout, /another launcher is already running/);

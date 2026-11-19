@@ -6,7 +6,7 @@ import { compareVersions, isValidVersion } from "./semver.ts";
 import { signBytes, verifyBytes } from "./signing.ts";
 
 export interface Artifact {
-  /** Location of app.js, resolved relative to the manifest's own URL. */
+  /** Location of app.cjs, resolved relative to the manifest's own URL. */
   readonly url: string;
   /** Exact size in bytes. Downloads are aborted as soon as they exceed it. */
   readonly size: number;

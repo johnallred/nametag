@@ -5,14 +5,17 @@ a running `.exe`, and a half-written binary bricks the install. We avoid the pro
 entirely by never replacing a running file.
 
 A small launcher executable stays fixed. Each app release lives in its own folder,
-`versions/<version>/app.js`, and a one-line `current` file names the active version. To
+`versions/<version>/app.cjs`, and a one-line `current` file names the active version. To
 update, we write a new folder alongside the old one, atomically rename a new `current`
 into place, and restart the app process. The previous version stays on disk as the
 rollback target.
 
 The launcher is the same SEA executable re-run in "app mode": `process.execPath` with a
-flag, which then `require()`s `versions/<current>/app.js` from disk. A release is
-therefore a single platform-independent JS bundle, not a per-OS binary.
+flag, which then `require()`s `versions/<current>/app.cjs` from disk. A release is
+therefore a single platform-independent JS bundle, not a per-OS binary. It is named
+`.cjs` because Node decides whether a `.js` file is CommonJS or an ES module from the
+nearest `package.json` above it. The extension makes the bundle load the same way
+wherever the data directory happens to be.
 
 ## Considered options
 

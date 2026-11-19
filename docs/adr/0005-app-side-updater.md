@@ -6,7 +6,7 @@ permanent on every installed client. So we keep it as small as possible:
 
 - take the single-instance lock
 - clean up leftover files
-- start `versions/<current>/app.js`
+- start `versions/<current>/app.cjs`
 - swap the `current` pointer when asked
 - roll back when a new version fails
 

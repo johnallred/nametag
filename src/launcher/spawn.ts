@@ -9,6 +9,7 @@
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { createRequire } from "node:module";
+import path from "node:path";
 import { isSea } from "node:sea";
 
 export const RUN_APP_FLAG = "--nametag-run-app";
@@ -39,5 +40,7 @@ export function appModeTarget(argv: readonly string[]): string | null {
  * needed to load it from disk.
  */
 export function runApp(appPath: string): void {
-  createRequire(appPath)(appPath);
+  // createRequire rejects relative paths.
+  const absolute = path.resolve(appPath);
+  createRequire(absolute)(absolute);
 }

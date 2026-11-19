@@ -30,9 +30,13 @@ export function defaultDataDir({ platform, env, homedir }: Environment = current
   }
 }
 
-/** The data directory, overridable with NAMETAG_DATA_DIR (used by tests and the demo). */
+/**
+ * The data directory, overridable with NAMETAG_DATA_DIR (used by tests and the
+ * demo). Always absolute: the launcher hands paths inside it to child
+ * processes, and require() can't load a relative path.
+ */
 export function resolveDataDir(environment: Environment = currentEnvironment()): string {
-  return environment.env.NAMETAG_DATA_DIR || defaultDataDir(environment);
+  return path.resolve(environment.env.NAMETAG_DATA_DIR || defaultDataDir(environment));
 }
 
 /** Every path inside the data directory, in one place. Each file has one writer, noted below. */

@@ -1,4 +1,4 @@
-// The app's entry point: the code inside each versions/<v>/app.js bundle.
+// The app's entry point: the code inside each versions/<v>/app.cjs bundle.
 //
 // Runs the ticker and, when started by the launcher, the updater, and speaks
 // the launcher's IPC protocol (src/shared/ipc.ts).

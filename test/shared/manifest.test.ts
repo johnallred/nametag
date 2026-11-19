@@ -21,7 +21,7 @@ const release: Release = {
   publishedAt: "2026-11-18T12:00:00Z",
   expiresAt: "2026-12-18T12:00:00Z",
   minLauncherVersion: "1.0.0",
-  artifact: { url: "artifacts/1.4.0/app.js", size: 48211, sha256: "a".repeat(64) },
+  artifact: { url: "artifacts/1.4.0/app.cjs", size: 48211, sha256: "a".repeat(64) },
 };
 
 function withChanges(changes: Record<string, unknown>): Record<string, unknown> {

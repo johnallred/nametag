@@ -1,7 +1,7 @@
 // Entry point for the release tool:
 //
 //   release keygen  [--out <dir>]
-//   release publish --artifact <app.js> --version <x.y.z> [--root <dir>]
+//   release publish --artifact <app.cjs> --version <x.y.z> [--root <dir>]
 //                   [--key <file> | NAMETAG_SIGNING_KEY=<base64>]
 //                   [--channel stable] [--min-launcher 1.0.0] [--valid-days 30]
 //   release refresh [--root <dir>] [--key <file> | NAMETAG_SIGNING_KEY=<base64>]
@@ -13,7 +13,7 @@ import { keygen, publish, refresh } from "./commands.ts";
 
 const USAGE = `usage:
   release keygen  [--out <dir>]
-  release publish --artifact <app.js> --version <x.y.z> [--root <dir>]
+  release publish --artifact <app.cjs> --version <x.y.z> [--root <dir>]
                   [--key <file> | env NAMETAG_SIGNING_KEY]
                   [--channel <name>] [--min-launcher <x.y.z>] [--valid-days <n>]
   release refresh [--root <dir>] [--key <file> | env NAMETAG_SIGNING_KEY] [--valid-days <n>]`;

@@ -1,9 +1,9 @@
 // Entry point for builds:
 //
-//   build app      --version <x.y.z> [--out dist/app.js]
+//   build app      --version <x.y.z> [--out dist/app.cjs]
 //                  [--public-key keys/signing.pub] [--manifest-url <url>]
 //   build launcher [--out-dir dist/launcher]
-//   build install  --app <app.js> --version <x.y.z> --out-dir <dir> [--launcher <exe>]
+//   build install  --app <app.cjs> --version <x.y.z> --out-dir <dir> [--launcher <exe>]
 
 import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
@@ -14,7 +14,7 @@ import { buildLauncherExecutable } from "./launcher.ts";
 const USAGE = `usage:
   build app      --version <x.y.z> [--out <file>] [--public-key <file>] [--manifest-url <url>]
   build launcher [--out-dir <dir>]
-  build install  --app <app.js> --version <x.y.z> --out-dir <dir> [--launcher <exe>]`;
+  build install  --app <app.cjs> --version <x.y.z> --out-dir <dir> [--launcher <exe>]`;
 
 async function main(argv: readonly string[]): Promise<void> {
   const [target, ...rest] = argv;
@@ -35,7 +35,7 @@ async function runBuildApp(args: readonly string[]): Promise<void> {
     args: [...args],
     options: {
       version: { type: "string" },
-      out: { type: "string", default: "dist/app.js" },
+      out: { type: "string", default: "dist/app.cjs" },
       "public-key": { type: "string" },
       "manifest-url": { type: "string" },
     },

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import path from "node:path";
 import { describe, it } from "node:test";
 import { defaultDataDir, resolveDataDir } from "../../src/shared/paths.ts";
 
@@ -28,6 +29,13 @@ describe("defaultDataDir", () => {
 
 describe("resolveDataDir", () => {
   it("prefers NAMETAG_DATA_DIR", () => {
-    assert.equal(resolveDataDir({ platform: "linux", env: { NAMETAG_DATA_DIR: "/tmp/x" }, homedir: "/home/ann" }), "/tmp/x");
+    const absolute = path.resolve("/tmp/x");
+    assert.equal(resolveDataDir({ platform: process.platform, env: { NAMETAG_DATA_DIR: absolute }, homedir: "/home/ann" }), absolute);
+  });
+
+  it("makes a relative NAMETAG_DATA_DIR absolute, since child processes require() paths inside it", () => {
+    const resolved = resolveDataDir({ platform: process.platform, env: { NAMETAG_DATA_DIR: "demo/client" }, homedir: "/home/ann" });
+    assert.ok(path.isAbsolute(resolved));
+    assert.equal(resolved, path.resolve("demo/client"));
   });
 });

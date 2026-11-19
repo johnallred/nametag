@@ -35,7 +35,7 @@ describe("current pointer", () => {
   it("names the installed version", async () => {
     const layout = dataLayout(await makeTempDir());
     await mkdir(path.join(layout.versions, "1.2.0"), { recursive: true });
-    await writeFile(path.join(layout.versions, "1.2.0", "app.js"), "");
+    await writeFile(path.join(layout.versions, "1.2.0", "app.cjs"), "");
     await writeCurrent(layout, "1.2.0");
     assert.equal(await readCurrent(layout), "1.2.0");
   });

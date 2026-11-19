@@ -1,7 +1,7 @@
 // The launcher's entry point. The same executable runs in one of two modes:
 //
-//   nametag                                  launcher: supervise the app
-//   nametag --nametag-run-app <path/app.js>  app mode: run one app bundle
+//   nametag                                   launcher: supervise the app
+//   nametag --nametag-run-app <path/app.cjs>  app mode: run one app bundle
 //
 // Kept small on purpose: this is the one component that doesn't update itself.
 

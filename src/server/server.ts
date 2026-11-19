@@ -2,7 +2,7 @@
 // out by `release publish`:
 //
 //   <root>/manifest.json
-//   <root>/artifacts/<version>/app.js
+//   <root>/artifacts/<version>/app.cjs
 //
 // It holds no state and has no API, so in production it can be swapped for a
 // bucket behind a CDN (ADR-0003). TLS is expected to be terminated in front of it.
@@ -23,6 +23,7 @@ export interface UpdateServerOptions {
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
   ".json": "application/json; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".cjs": "text/javascript; charset=utf-8",
 };
 
 export function createUpdateServer(options: UpdateServerOptions): Server {

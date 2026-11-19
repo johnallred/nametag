@@ -171,7 +171,7 @@ export class Updater {
     try {
       const url = new URL(release.artifact.url, this.#options.manifestUrl);
       log.info("downloading release", { stagedVersion: release.version, url: url.href, bytes: release.artifact.size });
-      await downloadVerified(url, path.join(partialDir, "app.js"), release.artifact, {
+      await downloadVerified(url, path.join(partialDir, "app.cjs"), release.artifact, {
         fetch: this.#options.fetch,
         signal: this.#signal(this.#options.downloadTimeoutMs),
       });
@@ -189,7 +189,7 @@ export class Updater {
 
 async function isStaged(dir: string, artifact: Artifact): Promise<boolean> {
   try {
-    const content = await readFile(path.join(dir, "app.js"));
+    const content = await readFile(path.join(dir, "app.cjs"));
     return content.length === artifact.size && createHash("sha256").update(content).digest("hex") === artifact.sha256;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
