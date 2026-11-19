@@ -64,6 +64,27 @@ questions I would have asked, the answer I guessed, and what each guess led to.
 - `src/server/`: a minimal static HTTP server for the manifest and artifacts.
 - `src/release/`: `keygen` and `publish`.
 
+**Process model**
+
+The launcher executable runs in one of two modes. Started normally, it supervises the
+app. Started with `--nametag-run-app <path>`, it loads and runs that app bundle. The
+supervisor starts each app version as a child process in app mode, with an IPC channel
+between them (`src/shared/ipc.ts`):
+
+| Message | Direction | Meaning |
+|---|---|---|
+| `healthy` | app → launcher | Startup succeeded. Ends the health-check wait. |
+| `staged` | app → launcher | A verified release is in `versions/<v>/`. |
+| `shutdown` | launcher → app | Finish the current tick, save state, exit 0. On Windows this is the only graceful stop, since there is no SIGTERM. |
+
+The launcher treats `staged` as a claim to check, not an order. The version must be
+valid, newer than the current one, not on the bad list, and actually installed. If the
+IPC channel closes because the launcher died, the app exits. Otherwise a restarted
+launcher would start a second copy beside it.
+
+The launcher has its own version (`src/launcher/version.ts`), bumped by hand, because a
+launcher change has to be shipped to clients manually.
+
 **Data directory** (per user, no admin rights needed)
 
 | OS | Location |
@@ -235,6 +256,7 @@ so a failed update on a client machine can be reconstructed from its logs alone.
 | No zero-gap handoff | Question 5: a gap of about a second is acceptable. | Hand listening sockets to the new process. This differs per OS. |
 | No staged rollout | Not required (question 12). | Add a rollout percentage to the manifest. Clients compare it against a stable hash of an install ID. |
 | No MSI, pkg or deb installers | Unpacking an archive into the data directory is enough to demonstrate the update path. | Native installers that do the same per-user install. |
+| The single-instance lock is a PID file | Node has no portable OS file lock. A stale lock from a crashed launcher is detected by checking whether its PID is alive. | If the OS reuses a dead launcher's PID, the lock looks held until that process exits. Two launchers starting at the same instant over a stale lock could both clear it. A named pipe or Unix socket lock, which the OS releases on exit, would close both gaps. |
 | Single-file releases only | The app is one bundle. | A release becomes a file list, each file with its own hash, staged the same way. |
 
 ## Decision records

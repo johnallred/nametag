@@ -1,12 +1,11 @@
 // The app's entry point: the code inside each versions/<v>/app.js bundle.
 //
-// Runs the ticker and, when started by the launcher, the updater. The launcher
-// side of the IPC channel (health reports, shutdown requests) arrives in the
-// next slice.
+// Runs the ticker and, when started by the launcher, the updater, and speaks
+// the launcher's IPC protocol (src/shared/ipc.ts).
 
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import type { AppMessage } from "../shared/ipc.ts";
+import type { AppMessage, LauncherMessage } from "../shared/ipc.ts";
 import { createLogger, stdoutSink, type Logger } from "../shared/log.ts";
 import { createFileSink } from "../shared/log-file.ts";
 import { dataLayout, resolveDataDir, type DataLayout } from "../shared/paths.ts";
@@ -75,6 +74,24 @@ async function main(): Promise<void> {
 
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.once(signal, () => void shutdown(signal));
+  }
+
+  if (process.send) {
+    // The launcher's shutdown request is also how a graceful stop works on
+    // Windows, which has no SIGTERM.
+    process.on("message", (message: unknown) => {
+      if ((message as Partial<LauncherMessage> | null)?.type === "shutdown") {
+        void shutdown("launcher request");
+      }
+    });
+    // An app without its launcher is unsupervised, and a restarted launcher
+    // would start a second copy alongside it. Better to exit.
+    process.on("disconnect", () => void shutdown("launcher disconnected"));
+
+    // Startup succeeded: state loaded, work running. This ends probation's
+    // health-check wait (ADR-0006).
+    const healthy: AppMessage = { type: "healthy" };
+    process.send(healthy);
   }
 }
 

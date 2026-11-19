@@ -1,21 +1,38 @@
 // Entry point for builds:
 //
-//   build app --version <x.y.z> [--out dist/app.js]
-//             [--public-key keys/signing.pub] [--manifest-url <url>]
+//   build app      --version <x.y.z> [--out dist/app.js]
+//                  [--public-key keys/signing.pub] [--manifest-url <url>]
+//   build launcher [--out-dir dist/launcher]
+//   build install  --app <app.js> --version <x.y.z> --out-dir <dir> [--launcher <exe>]
 
 import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { buildApp } from "./app.ts";
+import { assembleInstall } from "./install.ts";
+import { buildLauncherExecutable } from "./launcher.ts";
 
-const USAGE = "usage: build app --version <x.y.z> [--out <file>] [--public-key <file>] [--manifest-url <url>]";
+const USAGE = `usage:
+  build app      --version <x.y.z> [--out <file>] [--public-key <file>] [--manifest-url <url>]
+  build launcher [--out-dir <dir>]
+  build install  --app <app.js> --version <x.y.z> --out-dir <dir> [--launcher <exe>]`;
 
 async function main(argv: readonly string[]): Promise<void> {
   const [target, ...rest] = argv;
-  if (target !== "app") {
-    throw new Error(target === undefined ? "missing build target" : `unknown build target "${target}"`);
+  switch (target) {
+    case "app":
+      return runBuildApp(rest);
+    case "launcher":
+      return runBuildLauncher(rest);
+    case "install":
+      return runBuildInstall(rest);
+    default:
+      throw new Error(target === undefined ? "missing build target" : `unknown build target "${target}"`);
   }
+}
+
+async function runBuildApp(args: readonly string[]): Promise<void> {
   const { values } = parseArgs({
-    args: [...rest],
+    args: [...args],
     options: {
       version: { type: "string" },
       out: { type: "string", default: "dist/app.js" },
@@ -38,6 +55,34 @@ async function main(argv: readonly string[]): Promise<void> {
     ...(values["manifest-url"] ? { manifestUrl: values["manifest-url"] } : {}),
   });
   console.log(`built app ${values.version} -> ${values.out}`);
+}
+
+async function runBuildLauncher(args: readonly string[]): Promise<void> {
+  const { values } = parseArgs({ args: [...args], options: { "out-dir": { type: "string", default: "dist/launcher" } } });
+  const executable = await buildLauncherExecutable(values["out-dir"]);
+  console.log(`built launcher -> ${executable}`);
+}
+
+async function runBuildInstall(args: readonly string[]): Promise<void> {
+  const { values } = parseArgs({
+    args: [...args],
+    options: {
+      app: { type: "string" },
+      version: { type: "string" },
+      "out-dir": { type: "string" },
+      launcher: { type: "string" },
+    },
+  });
+  if (!values.app || !values.version || !values["out-dir"]) {
+    throw new Error("build install needs --app, --version and --out-dir");
+  }
+  await assembleInstall({
+    outDir: values["out-dir"],
+    appPath: values.app,
+    version: values.version,
+    ...(values.launcher ? { launcherPath: values.launcher } : {}),
+  });
+  console.log(`assembled install of ${values.version} -> ${values["out-dir"]}`);
 }
 
 main(process.argv.slice(2)).catch((error: unknown) => {

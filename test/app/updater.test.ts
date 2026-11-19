@@ -8,7 +8,7 @@ import { createLogger } from "../../src/shared/log.ts";
 import { dataLayout } from "../../src/shared/paths.ts";
 import { decodePublicKey } from "../../src/shared/signing.ts";
 import { silentLogger, startReleaseServer, type ReleaseServer } from "../fixtures.ts";
-import { makeTempDir } from "../helpers.ts";
+import { makeTempDir, waitFor } from "../helpers.ts";
 
 const V1 = "console.log('v1');";
 const V2 = "console.log('v2 is here');";
@@ -239,13 +239,3 @@ describe("Updater", () => {
     });
   });
 });
-
-async function waitFor(condition: () => boolean, timeoutMs = 5000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (!condition()) {
-    if (Date.now() > deadline) {
-      throw new Error("timed out waiting for condition");
-    }
-    await sleep(5);
-  }
-}

@@ -19,3 +19,14 @@ export async function makeTempDir(prefix = "nametag-test-"): Promise<string> {
   tempDirs.push(dir);
   return dir;
 }
+
+/** Polls `condition` until it returns true, failing after `timeoutMs`. */
+export async function waitFor(condition: () => boolean | Promise<boolean>, timeoutMs = 5000, what = "condition"): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await condition())) {
+    if (Date.now() > deadline) {
+      throw new Error(`timed out after ${timeoutMs}ms waiting for ${what}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
