@@ -113,6 +113,11 @@ A client accepts a manifest only if **all** of these hold:
 5. `version` is not on the launcher's bad-versions list.
 6. The running launcher's version is at least `minLauncherVersion`.
 
+Expiry has an operational cost: if no release goes out before the manifest expires,
+clients stop accepting it. `release refresh` re-signs the current release with a new
+expiry date and changes nothing else. Run it on a schedule, for example weekly with the
+default 30-day validity.
+
 A release is a single, platform-independent `app.js` bundle. The runtime lives in the
 launcher, so the same file works on every OS. There's no archive to unpack, which also
 removes a whole class of path-traversal bugs.
@@ -123,11 +128,12 @@ removes a whole class of path-traversal bugs.
    off exponentially up to the normal interval. The app keeps running regardless.
 2. **Verify.** The manifest is checked against the rules above. If nothing is acceptable,
    it waits for the next poll.
-3. **Download.** It streams the artifact to a temp file inside the data directory, with
-   a request timeout. It aborts if the download exceeds the declared `size`.
-4. **Check.** The file's SHA-256 must match the signed `sha256`.
-5. **Stage.** It writes `versions/<v>.partial/app.js`, then renames the folder to
-   `versions/<v>/`.
+3. **Download.** It streams the artifact into `versions/<v>.partial/app.js`, hashing as
+   it goes, with a request timeout. It aborts as soon as the download exceeds the
+   declared `size`.
+4. **Check.** The size and SHA-256 must match the signed manifest. If they don't, the
+   `.partial` folder is deleted.
+5. **Stage.** It renames `versions/<v>.partial/` to `versions/<v>/`.
 6. **Notify.** The app sends the launcher `{ type: "staged", version }` over IPC.
 7. **Swap.** The launcher writes the new version to a temp file
    (`current.<pid>.<random>.tmp`) and renames it over `current`. It records
@@ -150,8 +156,7 @@ Every step either completes or leaves the previous state intact. On disk, the on
 
 | Crash during… | State on disk afterwards | Recovery on next start |
 |---|---|---|
-| Download / hash check | A stray temp file. `current` untouched. | The temp file is deleted. The old version runs. |
-| Writing `versions/<v>.partial/` | A `.partial` folder. `current` untouched. | `.partial` folders are deleted. The old version runs. |
+| Download / hash check | A `versions/<v>.partial/` folder. `current` untouched. | `.partial` folders are deleted. The old version runs. |
 | Rename `.partial` → `<v>` | Either the `.partial` folder or the complete `<v>` folder. `current` untouched. | The old version runs. The next poll re-stages (or finds `<v>` already staged). |
 | Writing the `current` temp file | A stray `*.tmp` file. `current` untouched. | The temp file is deleted. The old version runs. |
 | Rename temp file → `current` | `rename` is atomic: `current` names either the old version or the new one. | Whichever it names runs. If it's the new one, normal probation applies. |
@@ -189,7 +194,18 @@ variable, and never committed. Tests generate throwaway keys.
 |---|---|---|
 | Manifest URL | built in at release time | `config.json` → `manifestUrl`, env `NAMETAG_MANIFEST_URL` |
 | Poll interval | 1 hour | `config.json` → `pollIntervalSeconds`, env `NAMETAG_POLL_INTERVAL_SECONDS` |
+| Tick interval | 5 seconds | `config.json` → `tickIntervalMs`, env `NAMETAG_TICK_INTERVAL_MS` |
 | Data directory | per-OS location above | env `NAMETAG_DATA_DIR` (used by tests) |
+
+Environment variables take precedence over `config.json`, which takes precedence over
+built-in values. An invalid value is logged and skipped, never fatal. The signing public
+key is deliberately not configurable: it's the trust anchor, so it comes only from the
+signed bundle.
+
+The launcher also tells the app its own version (`NAMETAG_LAUNCHER_VERSION`) and the
+versions it has rolled back from (`NAMETAG_BAD_VERSIONS`). The app only enables its
+updater when it was started by the launcher, because without a launcher nobody can
+switch versions.
 
 ## Logging
 

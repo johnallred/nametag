@@ -4,16 +4,19 @@
 //   release publish --artifact <app.js> --version <x.y.z> [--root <dir>]
 //                   [--key <file> | NAMETAG_SIGNING_KEY=<base64>]
 //                   [--channel stable] [--min-launcher 1.0.0] [--valid-days 30]
+//   release refresh [--root <dir>] [--key <file> | NAMETAG_SIGNING_KEY=<base64>]
+//                   [--valid-days 30]
 
 import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
-import { keygen, publish } from "./commands.ts";
+import { keygen, publish, refresh } from "./commands.ts";
 
 const USAGE = `usage:
   release keygen  [--out <dir>]
   release publish --artifact <app.js> --version <x.y.z> [--root <dir>]
                   [--key <file> | env NAMETAG_SIGNING_KEY]
-                  [--channel <name>] [--min-launcher <x.y.z>] [--valid-days <n>]`;
+                  [--channel <name>] [--min-launcher <x.y.z>] [--valid-days <n>]
+  release refresh [--root <dir>] [--key <file> | env NAMETAG_SIGNING_KEY] [--valid-days <n>]`;
 
 class UsageError extends Error {}
 
@@ -24,6 +27,8 @@ async function main(argv: readonly string[]): Promise<void> {
       return runKeygen(rest);
     case "publish":
       return runPublish(rest);
+    case "refresh":
+      return runRefresh(rest);
     default:
       throw new UsageError(command === undefined ? "missing command" : `unknown command "${command}"`);
   }
@@ -35,6 +40,23 @@ async function runKeygen(args: readonly string[]): Promise<void> {
   console.log(`private key: ${result.privateKeyPath}  (keep secret, never commit)`);
   console.log(`public key:  ${result.publicKeyPath}`);
   console.log(`\n${result.publicKey}`);
+}
+
+async function runRefresh(args: readonly string[]): Promise<void> {
+  const { values } = parseArgs({
+    args: [...args],
+    options: {
+      root: { type: "string", default: "releases" },
+      key: { type: "string" },
+      "valid-days": { type: "string", default: "30" },
+    },
+  });
+  const release = await refresh({
+    root: values.root,
+    privateKey: await loadPrivateKey(values.key),
+    validDays: Number(values["valid-days"]),
+  });
+  console.log(`refreshed ${release.version} in ${values.root} (now expires ${release.expiresAt})`);
 }
 
 async function runPublish(args: readonly string[]): Promise<void> {

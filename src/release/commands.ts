@@ -68,9 +68,7 @@ export async function publish(options: PublishOptions): Promise<Release> {
   } = options;
   parseVersion(version);
   parseVersion(minLauncherVersion);
-  if (!Number.isFinite(validDays) || validDays <= 0) {
-    throw new Error(`validDays must be positive, got ${validDays}`);
-  }
+  const expiresAt = expiryFrom(now, validDays);
 
   const privateKey = decodePrivateKey(options.privateKey);
   const previous = await readCurrentRelease(root, createPublicKey(privateKey));
@@ -89,13 +87,59 @@ export async function publish(options: PublishOptions): Promise<Release> {
     version,
     channel,
     publishedAt: toUtcTimestamp(now),
-    expiresAt: toUtcTimestamp(new Date(now.getTime() + validDays * 24 * 60 * 60 * 1000)),
+    expiresAt,
     minLauncherVersion,
     artifact: { url: relativeUrl, size: artifact.length, sha256 },
   };
+  await writeManifest(root, release, privateKey);
+  return release;
+}
+
+export interface RefreshOptions {
+  readonly root: string;
+  /** Base64 PKCS#8 Ed25519 private key. */
+  readonly privateKey: string;
+  readonly validDays?: number;
+  readonly now?: Date;
+}
+
+/**
+ * Re-signs the current release with a new expiry date, changing nothing else.
+ *
+ * Manifests expire so a stale one can't be replayed forever (ADR-0004). The
+ * flip side is that if no release goes out before expiry, clients stop
+ * accepting updates. Run this on a schedule (e.g. weekly, with the default
+ * 30-day validity) to keep the current manifest fresh between releases.
+ */
+export async function refresh({ root, privateKey: encodedKey, validDays = 30, now = new Date() }: RefreshOptions): Promise<Release> {
+  const expiresAt = expiryFrom(now, validDays);
+  const privateKey = decodePrivateKey(encodedKey);
+  const current = await readCurrentRelease(root, createPublicKey(privateKey));
+  if (!current) {
+    throw new Error(`no ${MANIFEST_FILE} in ${root}; publish a release first`);
+  }
+  // Refuse to extend the life of a manifest whose artifact has gone missing
+  // or changed: every client would download it and fail verification.
+  const artifact = await readFile(path.join(root, current.artifact.url)).catch(() => null);
+  if (!artifact || createHash("sha256").update(artifact).digest("hex") !== current.artifact.sha256) {
+    throw new Error(`artifact for ${current.version} is missing or doesn't match the manifest`);
+  }
+
+  const refreshed: Release = { ...current, expiresAt };
+  await writeManifest(root, refreshed, privateKey);
+  return refreshed;
+}
+
+async function writeManifest(root: string, release: Release, privateKey: KeyObject): Promise<void> {
   const manifest = createSignedManifest(release, privateKey);
   await writeFileAtomic(path.join(root, MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`);
-  return release;
+}
+
+function expiryFrom(now: Date, validDays: number): string {
+  if (!Number.isFinite(validDays) || validDays <= 0) {
+    throw new Error(`validDays must be positive, got ${validDays}`);
+  }
+  return toUtcTimestamp(new Date(now.getTime() + validDays * 24 * 60 * 60 * 1000));
 }
 
 /** The release currently in `<root>/manifest.json`, or null if none yet. */

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, it } from "node:test";
-import { keygen, MANIFEST_FILE, publish } from "../../src/release/commands.ts";
+import { keygen, MANIFEST_FILE, publish, refresh } from "../../src/release/commands.ts";
 import { readSignedManifest } from "../../src/shared/manifest.ts";
 import { decodePublicKey, generateSigningKeyPair } from "../../src/shared/signing.ts";
 import { makeTempDir } from "../helpers.ts";
@@ -120,5 +120,36 @@ describe("publish", () => {
       publish({ artifactPath, version: "1.0.0", privateKey: keys.privateKey, root, now, validDays: 0 }),
       /validDays/,
     );
+  });
+});
+
+describe("refresh", () => {
+  it("extends the expiry and changes nothing else", async () => {
+    const { keys, root, artifactPath, readManifest } = await setup();
+    const published = await publish({ artifactPath, version: "1.0.0", privateKey: keys.privateKey, root, now });
+
+    const later = new Date("2026-12-10T08:00:00Z");
+    const refreshed = await refresh({ root, privateKey: keys.privateKey, now: later, validDays: 14 });
+
+    assert.deepEqual(refreshed, { ...published, expiresAt: "2026-12-24T08:00:00Z" });
+    assert.deepEqual(await readManifest(), refreshed);
+  });
+
+  it("fails if nothing has been published yet", async () => {
+    const { keys, root } = await setup();
+    await assert.rejects(refresh({ root, privateKey: keys.privateKey, now }), /publish a release first/);
+  });
+
+  it("refuses to re-sign a manifest whose artifact is missing or changed", async () => {
+    const { keys, root, artifactPath } = await setup();
+    await publish({ artifactPath, version: "1.0.0", privateKey: keys.privateKey, root, now });
+    await writeFile(path.join(root, "artifacts/1.0.0/app.js"), "tampered");
+    await assert.rejects(refresh({ root, privateKey: keys.privateKey, now }), /missing or doesn't match/);
+  });
+
+  it("refuses a manifest signed with a different key", async () => {
+    const { keys, root, artifactPath } = await setup();
+    await publish({ artifactPath, version: "1.0.0", privateKey: keys.privateKey, root, now });
+    await assert.rejects(refresh({ root, privateKey: generateSigningKeyPair().privateKey, now }), /can't be verified/);
   });
 });

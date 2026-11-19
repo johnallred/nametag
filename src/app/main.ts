@@ -1,19 +1,23 @@
 // The app's entry point: the code inside each versions/<v>/app.js bundle.
 //
-// For now it runs standalone (`node src/app/main.ts`). The updater and the
-// launcher's IPC channel (health reports, shutdown requests) plug in here in
-// later slices.
+// Runs the ticker and, when started by the launcher, the updater. The launcher
+// side of the IPC channel (health reports, shutdown requests) arrives in the
+// next slice.
 
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import type { AppMessage } from "../shared/ipc.ts";
 import { createLogger, stdoutSink, type Logger } from "../shared/log.ts";
 import { createFileSink } from "../shared/log-file.ts";
-import { dataLayout, resolveDataDir } from "../shared/paths.ts";
-import { APP_VERSION } from "./build-info.ts";
+import { dataLayout, resolveDataDir, type DataLayout } from "../shared/paths.ts";
+import { decodePublicKey } from "../shared/signing.ts";
+import { APP_VERSION, MANIFEST_URL, PUBLIC_KEY } from "./build-info.ts";
+import { loadConfig, type AppConfig } from "./config.ts";
+import { readLauncherContext } from "./launcher-context.ts";
 import { loadAppState, saveAppState } from "./state.ts";
 import { Ticker } from "./ticker.ts";
+import { Updater } from "./updater.ts";
 
-const DEFAULT_TICK_INTERVAL_MS = 5000;
 /** If a clean shutdown takes longer than this, something is stuck; exit anyway. */
 const SHUTDOWN_DEADLINE_MS = 4000;
 
@@ -26,9 +30,16 @@ async function main(): Promise<void> {
     sinks: [stdoutSink, createFileSink(path.join(layout.logs, "app.log"))],
   });
 
+  const config = await loadConfig({
+    configFile: layout.config,
+    env: process.env,
+    builtInManifestUrl: MANIFEST_URL,
+    log,
+  });
+
   const state = await loadAppState(layout.appState, log);
   const ticker = new Ticker({
-    intervalMs: tickInterval(log),
+    intervalMs: config.tickIntervalMs,
     initialTicks: state.ticks,
     log,
     onTick: async (ticks) => {
@@ -38,7 +49,10 @@ async function main(): Promise<void> {
     },
   });
   ticker.start();
-  log.info("started", { dataDir: layout.root, ticks: state.ticks });
+
+  const updater = createUpdater(config, layout, log);
+  updater?.start();
+  log.info("started", { dataDir: layout.root, ticks: state.ticks, updates: updater ? "enabled" : "disabled" });
 
   let shuttingDown = false;
   const shutdown = async (reason: string): Promise<void> => {
@@ -52,6 +66,7 @@ async function main(): Promise<void> {
       process.exit(1);
     }, SHUTDOWN_DEADLINE_MS).unref();
 
+    updater?.stop();
     await ticker.stop();
     await saveAppState(layout.appState, { ticks: ticker.ticks });
     log.info("stopped", { ticks: ticker.ticks });
@@ -63,17 +78,37 @@ async function main(): Promise<void> {
   }
 }
 
-function tickInterval(log: Logger): number {
-  const raw = process.env.NAMETAG_TICK_INTERVAL_MS;
-  if (raw === undefined) {
-    return DEFAULT_TICK_INTERVAL_MS;
+/** The updater, or null (with the reason logged) when updates can't work. */
+function createUpdater(config: AppConfig, layout: DataLayout, log: Logger): Updater | null {
+  const disabled = (reason: string): null => {
+    log.info("updates disabled", { reason });
+    return null;
+  };
+  const launcher = readLauncherContext(process.env, typeof process.send === "function");
+  if (!launcher) {
+    return disabled("not started by the launcher");
   }
-  const value = Number(raw);
-  if (Number.isInteger(value) && value > 0) {
-    return value;
+  if (!PUBLIC_KEY) {
+    return disabled("no public key built in");
   }
-  log.warn("ignoring invalid NAMETAG_TICK_INTERVAL_MS", { value: raw });
-  return DEFAULT_TICK_INTERVAL_MS;
+  if (!config.manifestUrl) {
+    return disabled("no manifest URL configured");
+  }
+
+  return new Updater({
+    manifestUrl: config.manifestUrl,
+    publicKey: decodePublicKey(PUBLIC_KEY),
+    installedVersion: APP_VERSION,
+    launcherVersion: launcher.launcherVersion,
+    badVersions: launcher.badVersions,
+    pollIntervalMs: config.pollIntervalMs,
+    layout,
+    log,
+    onStaged: (version) => {
+      const message: AppMessage = { type: "staged", version };
+      process.send?.(message);
+    },
+  });
 }
 
 main().catch((error: unknown) => {
