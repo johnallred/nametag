@@ -215,7 +215,9 @@ variable, and never committed. Tests generate throwaway keys.
 |---|---|---|
 | Manifest URL | built in at release time | `config.json` → `manifestUrl`, env `NAMETAG_MANIFEST_URL` |
 | Poll interval | 1 hour | `config.json` → `pollIntervalSeconds`, env `NAMETAG_POLL_INTERVAL_SECONDS` |
+| First update check | 10 seconds after start | `config.json` → `firstCheckDelaySeconds`, env `NAMETAG_FIRST_CHECK_DELAY_SECONDS` |
 | Tick interval | 5 seconds | `config.json` → `tickIntervalMs`, env `NAMETAG_TICK_INTERVAL_MS` |
+| Launcher health timeout / probation / shutdown deadline | 10 s / 30 s / 5 s | env `NAMETAG_HEALTH_TIMEOUT_MS`, `NAMETAG_PROBATION_MS`, `NAMETAG_SHUTDOWN_TIMEOUT_MS` (tests and demos; the launcher has no config file, to keep it minimal) |
 | Data directory | per-OS location above | env `NAMETAG_DATA_DIR` (used by tests) |
 
 Environment variables take precedence over `config.json`, which takes precedence over

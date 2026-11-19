@@ -119,6 +119,7 @@ function createUpdater(config: AppConfig, layout: DataLayout, log: Logger): Upda
     launcherVersion: launcher.launcherVersion,
     badVersions: launcher.badVersions,
     pollIntervalMs: config.pollIntervalMs,
+    initialDelayMs: config.firstCheckDelayMs,
     layout,
     log,
     onStaged: (version) => {

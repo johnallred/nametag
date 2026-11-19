@@ -15,6 +15,7 @@ import { acquireLock } from "./lock.ts";
 import { appModeTarget, createAppSpawner, runApp } from "./spawn.ts";
 import { isInstalled, loadLauncherState, readCurrent, writeCurrent, type LauncherState } from "./state.ts";
 import { Supervisor } from "./supervisor.ts";
+import { readTimingOverrides } from "./timings.ts";
 import { LAUNCHER_VERSION } from "./version.ts";
 
 async function main(): Promise<number | null> {
@@ -48,6 +49,7 @@ async function main(): Promise<number | null> {
     currentVersion: current,
     state,
     spawnApp: createAppSpawner(),
+    ...readTimingOverrides(process.env),
   });
   log.info("launcher started", { dataDir: layout.root, appVersion: current });
   supervisor.start();

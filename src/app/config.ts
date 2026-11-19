@@ -19,6 +19,8 @@ export interface AppConfig {
   /** Undefined means updates are disabled (e.g. a development build). */
   readonly manifestUrl: string | undefined;
   readonly pollIntervalMs: number;
+  /** Delay before the first update check, so startup and probation settle first. */
+  readonly firstCheckDelayMs: number;
   readonly tickIntervalMs: number;
 }
 
@@ -30,6 +32,7 @@ export interface ConfigSources {
 }
 
 const DEFAULT_POLL_INTERVAL_SECONDS = 60 * 60;
+const DEFAULT_FIRST_CHECK_DELAY_SECONDS = 10;
 const DEFAULT_TICK_INTERVAL_MS = 5000;
 
 export async function loadConfig({ configFile, env, builtInManifestUrl, log }: ConfigSources): Promise<AppConfig> {
@@ -69,6 +72,17 @@ export async function loadConfig({ configFile, env, builtInManifestUrl, log }: C
         ],
         parsePositiveNumber,
         DEFAULT_POLL_INTERVAL_SECONDS,
+      ),
+    firstCheckDelayMs:
+      1000 *
+      pick(
+        "firstCheckDelaySeconds",
+        [
+          ["env NAMETAG_FIRST_CHECK_DELAY_SECONDS", env.NAMETAG_FIRST_CHECK_DELAY_SECONDS],
+          ["config.json", file.firstCheckDelaySeconds],
+        ],
+        parseNonNegativeNumber,
+        DEFAULT_FIRST_CHECK_DELAY_SECONDS,
       ),
     tickIntervalMs: pick(
       "tickIntervalMs",
@@ -114,6 +128,11 @@ function parseUpdateUrl(value: unknown): string | undefined {
 
 // Environment variables arrive as strings, config.json values as numbers.
 function parsePositiveNumber(value: unknown): number | undefined {
+  const number = parseNonNegativeNumber(value);
+  return number !== undefined && number > 0 ? number : undefined;
+}
+
+function parseNonNegativeNumber(value: unknown): number | undefined {
   const number = typeof value === "string" ? Number(value) : value;
-  return typeof number === "number" && Number.isFinite(number) && number > 0 ? number : undefined;
+  return typeof number === "number" && Number.isFinite(number) && number >= 0 ? number : undefined;
 }

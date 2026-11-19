@@ -24,7 +24,7 @@ async function load(options: { file?: unknown; env?: NodeJS.ProcessEnv; builtIn?
 describe("loadConfig", () => {
   it("uses defaults when nothing is configured", async () => {
     const { config, warnings } = await load();
-    assert.deepEqual(config, { manifestUrl: undefined, pollIntervalMs: 3_600_000, tickIntervalMs: 5000 });
+    assert.deepEqual(config, { manifestUrl: undefined, pollIntervalMs: 3_600_000, firstCheckDelayMs: 10_000, tickIntervalMs: 5000 });
     assert.deepEqual(warnings, []);
   });
 
@@ -39,7 +39,7 @@ describe("loadConfig", () => {
       file,
       env: { NAMETAG_MANIFEST_URL: "http://localhost:8080/manifest.json", NAMETAG_POLL_INTERVAL_SECONDS: "0.5", NAMETAG_TICK_INTERVAL_MS: "10" },
     });
-    assert.deepEqual(config, { manifestUrl: "http://localhost:8080/manifest.json", pollIntervalMs: 500, tickIntervalMs: 10 });
+    assert.deepEqual(config, { manifestUrl: "http://localhost:8080/manifest.json", pollIntervalMs: 500, firstCheckDelayMs: 10_000, tickIntervalMs: 10 });
   });
 
   it("skips an invalid value with a warning and falls through to the next source", async () => {
@@ -48,7 +48,7 @@ describe("loadConfig", () => {
       file: { manifestUrl: "not a url", pollIntervalSeconds: -5 },
       env: { NAMETAG_TICK_INTERVAL_MS: "fast" },
     });
-    assert.deepEqual(config, { manifestUrl: "https://built.in/manifest.json", pollIntervalMs: 3_600_000, tickIntervalMs: 5000 });
+    assert.deepEqual(config, { manifestUrl: "https://built.in/manifest.json", pollIntervalMs: 3_600_000, firstCheckDelayMs: 10_000, tickIntervalMs: 5000 });
     assert.equal(warnings.length, 3);
   });
 
@@ -68,4 +68,11 @@ describe("loadConfig", () => {
       assert.equal(warnings.length, 1);
     });
   }
+});
+
+describe("firstCheckDelaySeconds", () => {
+  it("accepts zero, for an immediate first check", async () => {
+    const { config } = await load({ env: { NAMETAG_FIRST_CHECK_DELAY_SECONDS: "0" } });
+    assert.equal(config.firstCheckDelayMs, 0);
+  });
 });
