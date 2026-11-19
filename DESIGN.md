@@ -129,7 +129,8 @@ removes a whole class of path-traversal bugs.
 5. **Stage.** It writes `versions/<v>.partial/app.js`, then renames the folder to
    `versions/<v>/`.
 6. **Notify.** The app sends the launcher `{ type: "staged", version }` over IPC.
-7. **Swap.** The launcher writes `current.tmp` and renames it over `current`. It records
+7. **Swap.** The launcher writes the new version to a temp file
+   (`current.<pid>.<random>.tmp`) and renames it over `current`. It records
    the old version as `previous` in `launcher-state.json`, then sends the app
    `{ type: "shutdown" }`.
 8. **Drain.** The app finishes its current tick, saves `app-state.json`, and exits 0. If
@@ -152,8 +153,8 @@ Every step either completes or leaves the previous state intact. On disk, the on
 | Download / hash check | A stray temp file. `current` untouched. | The temp file is deleted. The old version runs. |
 | Writing `versions/<v>.partial/` | A `.partial` folder. `current` untouched. | `.partial` folders are deleted. The old version runs. |
 | Rename `.partial` → `<v>` | Either the `.partial` folder or the complete `<v>` folder. `current` untouched. | The old version runs. The next poll re-stages (or finds `<v>` already staged). |
-| Writing `current.tmp` | A stray `current.tmp`. `current` untouched. | The temp file is deleted. The old version runs. |
-| Rename `current.tmp` → `current` | `rename` is atomic: `current` names either the old version or the new one. | Whichever it names runs. If it's the new one, normal probation applies. |
+| Writing the `current` temp file | A stray `*.tmp` file. `current` untouched. | The temp file is deleted. The old version runs. |
+| Rename temp file → `current` | `rename` is atomic: `current` names either the old version or the new one. | Whichever it names runs. If it's the new one, normal probation applies. |
 | Probation of the new version | `current` names the new version, and `previous` is recorded. | The launcher runs the new version under probation again. A failure rolls back. |
 
 `rename` within one directory is atomic on POSIX filesystems. On Windows, Node's
