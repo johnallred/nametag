@@ -9,7 +9,9 @@ const tempDirs: string[] = [];
 // when the whole file finishes. Calling after() inside makeTempDir instead
 // would attach it to whichever hook or test is running, and a dir created in
 // a before() hook would be deleted as soon as that hook returned.
-after(() => Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true }))));
+// Retries: on Windows, a process a test just stopped can hold files open for
+// a moment after it exits.
+after(() => Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }))));
 
 /** A fresh temp directory, removed when the current test file finishes. */
 export async function makeTempDir(prefix = "nametag-test-"): Promise<string> {

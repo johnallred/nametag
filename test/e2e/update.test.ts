@@ -5,76 +5,16 @@
 // launcher and app.
 
 import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
 import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { createInterface } from "node:readline";
 import { after, describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
 import { buildApp } from "../../src/build/app.ts";
 import { assembleInstall } from "../../src/build/install.ts";
 import { publish } from "../../src/release/commands.ts";
 import { generateSigningKeyPair } from "../../src/shared/signing.ts";
+import { readCurrent, RunningClient } from "../client.ts";
 import { startReleaseServer, type ReleaseServer } from "../fixtures.ts";
-import { makeTempDir, waitFor } from "../helpers.ts";
-
-const LAUNCHER = fileURLToPath(new URL("../../src/launcher/main.ts", import.meta.url));
-
-interface LogRecord {
-  readonly msg: string;
-  readonly component: "launcher" | "app";
-  readonly version: string;
-  readonly [field: string]: unknown;
-}
-
-/** A running launcher and everything it (and its app) has logged. */
-class RunningClient {
-  readonly records: LogRecord[] = [];
-  readonly #process: ChildProcess;
-  readonly #exited: Promise<void>;
-
-  constructor(dataDir: string) {
-    this.#process = spawn(process.execPath, [LAUNCHER], {
-      env: {
-        ...process.env,
-        NAMETAG_DATA_DIR: dataDir,
-        NAMETAG_TICK_INTERVAL_MS: "50",
-        NAMETAG_POLL_INTERVAL_SECONDS: "0.2",
-        NAMETAG_FIRST_CHECK_DELAY_SECONDS: "0",
-        NAMETAG_HEALTH_TIMEOUT_MS: "5000",
-        NAMETAG_PROBATION_MS: "1000",
-      },
-      // stderr is captured, not shown: the broken release's crash is expected noise.
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    this.#exited = new Promise((resolve) => this.#process.once("exit", () => resolve()));
-    this.#process.stderr?.resume();
-    createInterface({ input: this.#process.stdout! }).on("line", (line) => {
-      try {
-        this.records.push(JSON.parse(line) as LogRecord);
-      } catch {
-        // Not a log line; ignore.
-      }
-    });
-  }
-
-  /** Waits until a log record matches, and returns it. */
-  async waitForLog(what: string, match: Partial<LogRecord>, timeoutMs = 10_000): Promise<LogRecord> {
-    const find = () => this.records.find((record) => Object.entries(match).every(([key, value]) => record[key] === value));
-    await waitFor(() => find() !== undefined, timeoutMs, what);
-    return find()!;
-  }
-
-  async stop(): Promise<void> {
-    // On Windows this is a hard kill; the app then exits on IPC disconnect.
-    this.#process.kill("SIGTERM");
-    await this.#exited;
-  }
-}
-
-async function readCurrent(dataDir: string): Promise<string> {
-  return (await readFile(path.join(dataDir, "current"), "utf8")).trim();
-}
+import { makeTempDir } from "../helpers.ts";
 
 describe("end to end", () => {
   /** A server, bundles built to trust its key, and a client running 1.0.0. */
@@ -94,7 +34,7 @@ describe("end to end", () => {
     const dataDir = path.join(dir, "client");
     await assembleInstall({ outDir: dataDir, appPath: path.join(dir, "app-1.0.0.js"), version: "1.0.0" });
 
-    const client = new RunningClient(dataDir);
+    const client = RunningClient.fromSource(dataDir);
     after(() => client.stop());
     await client.waitForLog("1.0.0 healthy", { msg: "app healthy", appVersion: "1.0.0" });
     return { server, client, dataDir, bundle };
