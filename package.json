@@ -1,0 +1,25 @@
+{
+  "name": "nametag",
+  "version": "1.0.0",
+  "description": "A desktop program that keeps itself up to date.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "build": "node src/build/main.ts",
+    "app": "node src/app/main.ts",
+    "release": "node src/release/main.ts",
+    "server": "node src/server/main.ts",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "test:sea": "node --test \"test/smoke/*.smoke.ts\""
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
+    "postject": "1.0.0-alpha.6",
+    "typescript": "^7.0.2"
+  }
+}
