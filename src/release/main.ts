@@ -4,6 +4,7 @@
 //   release publish --artifact <app.cjs> --version <x.y.z> [--root <dir>]
 //                   [--key <file> | NAMETAG_SIGNING_KEY=<base64>]
 //                   [--channel stable] [--min-launcher 1.0.0] [--valid-days 30]
+//                   [--layout versioned|flat]
 //   release refresh [--root <dir>] [--key <file> | NAMETAG_SIGNING_KEY=<base64>]
 //                   [--valid-days 30]
 
@@ -16,6 +17,7 @@ const USAGE = `usage:
   release publish --artifact <app.cjs> --version <x.y.z> [--root <dir>]
                   [--key <file> | env NAMETAG_SIGNING_KEY]
                   [--channel <name>] [--min-launcher <x.y.z>] [--valid-days <n>]
+                  [--layout versioned|flat]
   release refresh [--root <dir>] [--key <file> | env NAMETAG_SIGNING_KEY] [--valid-days <n>]`;
 
 class UsageError extends Error {}
@@ -70,8 +72,12 @@ async function runPublish(args: readonly string[]): Promise<void> {
       channel: { type: "string", default: "stable" },
       "min-launcher": { type: "string", default: "1.0.0" },
       "valid-days": { type: "string", default: "30" },
+      layout: { type: "string", default: "versioned" },
     },
   });
+  if (values.layout !== "versioned" && values.layout !== "flat") {
+    throw new UsageError(`--layout must be "versioned" or "flat", got "${values.layout}"`);
+  }
   if (!values.artifact || !values.version) {
     throw new UsageError("publish needs --artifact and --version");
   }
@@ -83,6 +89,7 @@ async function runPublish(args: readonly string[]): Promise<void> {
     root: values.root,
     channel: values.channel,
     minLauncherVersion: values["min-launcher"],
+    layout: values.layout,
     validDays: Number(values["valid-days"]),
   });
   console.log(`published ${release.version} to ${values.root} (sha256 ${release.artifact.sha256}, expires ${release.expiresAt})`);
