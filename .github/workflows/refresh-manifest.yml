@@ -1,0 +1,40 @@
+name: Refresh manifest
+
+# Manifests expire after 30 days so a stale one can't be replayed. If no release
+# goes out before then, clients stop accepting updates. This re-signs the latest
+# release's manifest weekly, changing nothing else.
+#
+# Note: GitHub pauses scheduled workflows in a public repo after 60 days without
+# repository activity. Re-enable it from the Actions tab if that happens.
+
+on:
+  schedule:
+    - cron: "17 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Re-sign the latest manifest
+        env:
+          NAMETAG_SIGNING_KEY: ${{ secrets.NAMETAG_SIGNING_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="$(gh release view --json tagName --jq .tagName)"
+          mkdir releases
+          gh release download "$TAG" --dir releases --pattern manifest.json --pattern 'app-*.cjs'
+          # `refresh` checks the artifact against the manifest before re-signing.
+          node src/release/main.ts refresh --root releases
+          gh release upload "$TAG" releases/manifest.json --clobber

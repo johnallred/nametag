@@ -1,0 +1,59 @@
+name: Release
+
+# Publishing a release is pushing a tag: `git tag v1.2.0 && git push origin v1.2.0`.
+# This builds the app, signs a manifest, and attaches both to a GitHub Release.
+# Clients poll .../releases/latest/download/manifest.json, so the newest release
+# is what they update to.
+#
+# One-time setup (README.md > "Testing remotely with GitHub"):
+#   secret   NAMETAG_SIGNING_KEY  contents of keys/signing.key
+#   variable NAMETAG_PUBLIC_KEY   contents of keys/signing.pub
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: Build, sign and publish
+        env:
+          NAMETAG_SIGNING_KEY: ${{ secrets.NAMETAG_SIGNING_KEY }}
+          NAMETAG_PUBLIC_KEY: ${{ vars.NAMETAG_PUBLIC_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ -z "$NAMETAG_SIGNING_KEY" ] || [ -z "$NAMETAG_PUBLIC_KEY" ]; then
+            echo "::error::Set the NAMETAG_SIGNING_KEY secret and the NAMETAG_PUBLIC_KEY variable first."
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          printf '%s\n' "$NAMETAG_PUBLIC_KEY" > "$RUNNER_TEMP/signing.pub"
+          MANIFEST_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/manifest.json"
+
+          npm run build -- app --version "$VERSION" --out "dist/app-$VERSION.cjs" \
+            --public-key "$RUNNER_TEMP/signing.pub" --manifest-url "$MANIFEST_URL"
+          npm run release -- publish --artifact "dist/app-$VERSION.cjs" --version "$VERSION" \
+            --layout flat --root releases
+
+          # Both files go up together, so a client never sees a manifest whose
+          # artifact is missing.
+          gh release create "$TAG" releases/manifest.json "releases/app-$VERSION.cjs" \
+            --title "$TAG" --generate-notes --latest

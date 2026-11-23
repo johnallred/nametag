@@ -46,6 +46,30 @@ describe("keygen", () => {
   });
 });
 
+describe("flat layout (GitHub release assets)", () => {
+  it("puts the artifact next to the manifest, named by version, with a relative url", async () => {
+    const { keys, root, artifactPath, readManifest } = await setup();
+    await publish({ artifactPath, version: "1.0.0", privateKey: keys.privateKey, root, layout: "flat", now });
+
+    const release = await readManifest();
+    assert.equal(release.artifact.url, "app-1.0.0.cjs");
+    assert.equal(await readFile(path.join(root, "app-1.0.0.cjs"), "utf8"), "console.log('hello');");
+    await assert.rejects(stat(path.join(root, "artifacts")), { code: "ENOENT" });
+  });
+
+  it("can be refreshed from just the manifest and artifact files, as the scheduled job does", async () => {
+    const { keys, root, artifactPath, readManifest } = await setup();
+    await publish({ artifactPath, version: "1.0.0", privateKey: keys.privateKey, root, layout: "flat", now });
+
+    const later = new Date("2026-12-10T12:00:00Z");
+    await refresh({ root, privateKey: keys.privateKey, now: later });
+    const release = await readManifest();
+    assert.equal(release.version, "1.0.0");
+    assert.equal(release.artifact.url, "app-1.0.0.cjs");
+    assert.equal(release.expiresAt, "2027-01-09T12:00:00Z");
+  });
+});
+
 describe("publish", () => {
   it("writes the artifact and a signed manifest that verifies against the public key", async () => {
     const { keys, root, artifactPath, readManifest } = await setup();

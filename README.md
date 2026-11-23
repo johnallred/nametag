@@ -36,7 +36,10 @@ launcher (single executable, embeds Node) ◀──IPC──▶ app (versions/<v
 - **Probation and rollback.** A new version must report healthy within 10 s and stay up
   for 30 s. Otherwise the launcher switches back and never tries that version again.
 
-## Try it
+## Testing locally
+
+The update server runs on your machine, so the whole loop (publish, download, verify,
+switch, roll back) happens on one computer with no network or accounts.
 
 Needs Node 22.18 or later. The commands below use a POSIX shell. On Windows PowerShell,
 set environment variables with `$env:NAME="value"`. The launcher is
@@ -91,6 +94,105 @@ Some things to try next:
 Every setting and its override is listed in
 [DESIGN.md → Configuration](DESIGN.md#configuration).
 
+## Testing remotely with GitHub
+
+Here GitHub is the update server and your machine is just a client. Publishing a release
+means pushing a tag. A workflow builds the app, signs the manifest, and attaches
+`manifest.json` and `app-<version>.cjs` to a GitHub Release. The client polls
+`https://github.com/<you>/nametag/releases/latest/download/manifest.json`, which always
+points at the newest release. Nothing needs to change in the client: it already follows
+redirects, requires HTTPS, and trusts only the signature.
+
+```
+git tag v1.1.0 ─push─▶ GitHub Action ─builds, signs─▶ Release (manifest.json + app-1.1.0.cjs)
+                                                          ▲ HTTPS poll
+                                       client on your machine (launcher + app)
+```
+
+**Requirements:** the repository must be **public**. GitHub serves
+`releases/latest/download` anonymously only for public repositories, and the client sends
+no credentials. You also need the [`gh` CLI](https://cli.github.com), signed in.
+
+### One-time setup
+
+1. **Use a signing key you're happy to publish with.** Either reuse `keys/signing.*` or
+   create a fresh pair (`npm run release -- keygen --out keys-github`). Every client
+   trusts only the public key it was built with, so changing keys later orphans installed
+   clients.
+2. **Give the workflows the keys.** The private key is a secret. The public key isn't, so
+   it's a plain variable.
+
+   ```sh
+   gh secret set NAMETAG_SIGNING_KEY < keys/signing.key
+   gh variable set NAMETAG_PUBLIC_KEY < keys/signing.pub
+   ```
+
+3. **Push the repository** to GitHub (`git push origin main`). CI runs the tests on all
+   three operating systems.
+
+### Run it
+
+```sh
+REPO=johnallred/nametag     # your GitHub owner/repo
+
+# 1. Build the 1.0.0 client against GitHub, with the public key from step 2 above.
+#    This uses its own folder, demo/github-client, so it doesn't collide with the
+#    local demo's demo/client (`install` refuses to overwrite an existing install).
+npm run build -- app --version 1.0.0 --out dist/app-1.0.0.cjs \
+  --public-key keys/signing.pub \
+  --manifest-url https://github.com/$REPO/releases/latest/download/manifest.json
+npm run build -- launcher
+npm run build -- install --launcher dist/launcher/nametag \
+  --app dist/app-1.0.0.cjs --version 1.0.0 --out-dir demo/github-client
+
+# 2. Publish 1.0.0 so the manifest exists. Wait for the Release workflow to go green.
+git tag v1.0.0 && git push origin v1.0.0
+
+# 3. Run the client. Polls every 30 s instead of hourly.
+NAMETAG_DATA_DIR=demo/github-client NAMETAG_FIRST_CHECK_DELAY_SECONDS=0 \
+  NAMETAG_POLL_INTERVAL_SECONDS=30 demo/github-client/nametag
+
+# 4. In another terminal: ship a new version and watch the client switch.
+git tag v1.1.0 && git push origin v1.1.0
+```
+
+On Windows, use the PowerShell forms from [Testing locally](#testing-locally). The version
+comes from the tag (`v1.1.0` becomes `1.1.0`), so there's no file to edit before tagging.
+
+About 30 to 90 seconds after the workflow finishes, the client logs that it downloaded
+and staged 1.1.0, then switches to it. About 30 seconds after that it logs
+`new version confirmed`. GitHub's CDN can briefly serve the previous manifest, so allow a
+minute or two.
+
+The broken-release test from [Testing locally](#testing-locally) works here too: tag a
+commit whose app throws on start, and the client rolls back and never retries that
+version. To withdraw a bad release, delete the GitHub Release and its tag.
+
+### Keeping the manifest fresh
+
+Manifests expire after 30 days. The
+[refresh workflow](.github/workflows/refresh-manifest.yml) re-signs the latest release's
+manifest every Monday, and you can run it by hand from the Actions tab. GitHub pauses
+scheduled workflows in a public repository after 60 days without activity, so if clients
+stop updating after a long quiet period, re-enable it there.
+
+### Publishing without the workflow
+
+The workflow runs exactly these commands, so you can do the same by hand:
+
+```sh
+npm run build -- app --version 1.1.0 --out dist/app-1.1.0.cjs \
+  --public-key keys/signing.pub \
+  --manifest-url https://github.com/$REPO/releases/latest/download/manifest.json
+npm run release -- publish --artifact dist/app-1.1.0.cjs --version 1.1.0 \
+  --key keys/signing.key --layout flat
+gh release create v1.1.0 releases/manifest.json releases/app-1.1.0.cjs --latest
+```
+
+`--layout flat` puts `app-<version>.cjs` next to `manifest.json`, which is the shape of a
+GitHub Release (a flat list of files). The default layout, `artifacts/<version>/app.cjs`,
+is what the local server uses.
+
 ## Tests
 
 ```sh
@@ -104,7 +206,8 @@ real bundles against a real update server. They check that a new release is swit
 to with its state carried across, that a release signed with another key is ignored,
 and that a release that crashes on start is rolled back.
 [CI](.github/workflows/ci.yml) runs everything, including the single-executable test,
-on Windows, macOS and Linux.
+on Windows, macOS and Linux. The [release](.github/workflows/release.yml) and
+[refresh](.github/workflows/refresh-manifest.yml) workflows handle GitHub publishing.
 
 ## Layout
 

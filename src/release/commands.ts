@@ -33,6 +33,12 @@ export async function keygen(outDir: string): Promise<KeygenResult> {
   return { privateKeyPath, publicKeyPath, publicKey: pair.publicKey };
 }
 
+export type ArtifactLayout = "versioned" | "flat";
+
+export function artifactPathFor(version: string, layout: ArtifactLayout): string {
+  return layout === "flat" ? `app-${version}.cjs` : `artifacts/${version}/app.cjs`;
+}
+
 export interface PublishOptions {
   /** The built app bundle to release. */
   readonly artifactPath: string;
@@ -43,13 +49,21 @@ export interface PublishOptions {
   readonly root: string;
   readonly channel?: string;
   readonly minLauncherVersion?: string;
+  /**
+   * Where the artifact goes relative to the manifest. "versioned" (default) uses
+   * `artifacts/<version>/app.cjs`, for the static update server. "flat" uses
+   * `app-<version>.cjs` next to the manifest, which is the shape of a GitHub
+   * release's assets (a flat list of files).
+   */
+  readonly layout?: ArtifactLayout;
   /** How long the signed manifest stays valid (DESIGN.md#manifest). */
   readonly validDays?: number;
   readonly now?: Date;
 }
 
 /**
- * Copies the artifact into `<root>/artifacts/<version>/app.cjs` and replaces
+ * Copies the artifact into `<root>/artifacts/<version>/app.cjs` (or, with the
+ * "flat" layout, `<root>/app-<version>.cjs`) and replaces
  * `<root>/manifest.json` with a newly signed manifest pointing at it.
  *
  * The manifest is written last and atomically, so clients see either the
@@ -63,6 +77,7 @@ export async function publish(options: PublishOptions): Promise<Release> {
     root,
     channel = "stable",
     minLauncherVersion = "1.0.0",
+    layout = "versioned",
     validDays = 30,
     now = new Date(),
   } = options;
@@ -80,7 +95,7 @@ export async function publish(options: PublishOptions): Promise<Release> {
 
   const artifact = await readFile(artifactPath);
   const sha256 = createHash("sha256").update(artifact).digest("hex");
-  const relativeUrl = `artifacts/${version}/app.cjs`;
+  const relativeUrl = artifactPathFor(version, layout);
   await storeArtifact(path.join(root, relativeUrl), artifact, sha256);
 
   const release: Release = {
